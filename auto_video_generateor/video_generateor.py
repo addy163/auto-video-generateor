@@ -16,7 +16,7 @@ import tempfile
 import gradio as gr
 import pydub
 import requests
-from moviepy.editor import *
+from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips
 from PIL import Image, ImageDraw, ImageFont
 from pydub.silence import detect_leading_silence
 
@@ -152,6 +152,9 @@ tts_engine.setProperty('rate', rate)  # 语速
 tts_engine.setProperty('volume', volume)  # 音量
 
 
+# from gtts import gTTS
+
+
 def synthesize_speech(sentences, voice="zh-CN-YunxiNeural", rate='+0%', volume='+0%', pitch='+0Hz', code_name="",
                       save_path=''):
     if save_path:
@@ -179,10 +182,18 @@ def synthesize_speech(sentences, voice="zh-CN-YunxiNeural", rate='+0%', volume='
         sentence = re.sub(r'[\s"\'\-=\{\}]+', ' ', sentence)
 
         # edge-tts --pitch=-50Hz --voice zh-CN-YunyangNeural --text "大家好，欢迎关注我的微信公众号：AI技术实战，我会在这里分享各种AI技术、AI教程、AI开源项目。" --write-media hello_in_cn.mp3
-        os.system(
-            f'edge-tts --voice {voice} --rate={rate} --volume={volume} --pitch={pitch} --text "{sentence}" --write-media "{audio_path}"')
+        # fixme edge-tts废了，语音合成方面自行调大厂TTS接口或者自行部署模型吧！
+        # os.system(
+        #     f'edge-tts --voice {voice} --rate={rate} --volume={volume} --pitch={pitch} --text "{sentence}" --write-media "{audio_path}"')
         # communicate = edge_tts.Communicate(sentence, voice=voice, rate=rate, volume=volume, pitch=pitch)
         # await communicate.save(audio_path)
+
+        # try:
+        #     # 用谷歌TTS，要科学上网！！！
+        #     tts = gTTS(text=sentence, lang="zh")
+        #     tts.save(audio_path)
+        # except Exception as e:
+        #     print(e)
 
         # 如果edge-tts合成失败，则用默认声音
         if not os.path.isfile(audio_path) or os.path.getsize(audio_path) < 1024:
@@ -429,6 +440,14 @@ def create_video(results, code_name="", save_path='', request: gr.Request = None
         video = image.set_audio(audio)
         clips.append(video)
 
+    # 逐个验证视频片段
+    for i, clip in enumerate(clips):
+        try:
+            clip.preview()  # 测试能否播放
+        except:
+            print("损坏的视频片段:", i)
+            clips.remove(clip)
+
     final_video = concatenate_videoclips(clips, method="compose")
     final_video.write_videofile(video_file, fps=4)  # 24
     print(f"create_video 输入: {results}")
@@ -436,7 +455,7 @@ def create_video(results, code_name="", save_path='', request: gr.Request = None
     return video_file
 
 
-def generate_results(story, size, font, person, voice_input, rate_input, volume_input, pitch_input, code_name=""):
+def generate_results_base(story, size, font, person, voice_input, rate_input, volume_input, pitch_input, code_name=""):
     # global _save_dir
     _save_dir = get_savepath(code_name, '', mkdir_ok=True)
     metadata_file = get_savepath(code_name, 'metadata.json', mkdir_ok=False)
@@ -472,7 +491,8 @@ def one_click_pipeline(theme, template, size, font, person, voice_input, rate_in
 
     story = generate_story(theme, template, code_name)
     yield story, None, None
-    results = generate_results(story, size, font, person, voice_input, rate_input, volume_input, pitch_input, code_name)
+    results = generate_results_base(story, size, font, person, voice_input, rate_input, volume_input, pitch_input,
+                                    code_name)
     yield story, results, None
     video = create_video(results, code_name)
     yield story, results, video

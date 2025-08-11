@@ -12,6 +12,7 @@ from common_utils import get_savepath, chat
 
 
 def ppt_to_images_windows(pptx_path, code_name):
+    """windows环境，需要激活的Microsoft Office支持。"""
     image_dir = get_savepath(code_name, 'image', mkdir_ok=True)
     # 初始化COM库
     pythoncom.CoInitialize()
@@ -28,8 +29,6 @@ def ppt_to_images_windows(pptx_path, code_name):
         # 将幻灯片导出为图片
         image_path = f'{image_dir}/image_{i + 100}.jpg'
         slide.Export(image_path, "JPG")
-        images.append(image_path)
-
     # 关闭PPT文件
     presentation.Close()
     # 关闭PowerPoint
@@ -63,6 +62,7 @@ def ppt_to_texts_windows(pptx_path, code_name):
 
 
 def ppt_to_pdf(inpath, code_name):
+    """需要下载安装LibreOffice软件，培训环境变量，自行搜索解决安装问题。"""
     pdf_dir = get_savepath(code_name, 'pdf', mkdir_ok=True)
     if inpath.endswith('.pdf'):
         pdf_path = os.path.join(pdf_dir, 'document.pdf')
@@ -74,8 +74,8 @@ def ppt_to_pdf(inpath, code_name):
     shutil.copyfile(inpath, ppt_path)
 
     # Step 1: 使用libreoffice将PPT转换为PDF
-    libreoffice_path = r"C:\Program Files\LibreOffice\program\soffice.exe"
-    # libreoffice_path = "libreoffice"
+    # libreoffice_path = r"C:\Program Files\LibreOffice\program\soffice.exe"
+    libreoffice_path = "soffice"
 
     pdf_path = os.path.join(pdf_dir, os.path.splitext(os.path.basename(ppt_path))[0] + ".pdf")
     command = [

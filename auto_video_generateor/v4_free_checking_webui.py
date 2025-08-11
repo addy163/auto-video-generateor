@@ -213,7 +213,6 @@ def b_ppt_click(ppt, size, font, person, voice_input, rate_input, volume_input, 
     ]
 
     ppt_path, pdf_path = ppt_to_pdf(ppt, code_name=code_name)
-
     if ppt_path:
         sents = ppt_to_texts(ppt_path, code_name=code_name)
     else:
