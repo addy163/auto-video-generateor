@@ -138,10 +138,14 @@ pip install -r requirements.txt
 如果使用【PPT转视频】功能，还需要安装【LibreOffice】，并添加环境变量，安装方法自行问DeepSeek。
 
 ### 设置环境变量
-修改根目录下的`config.env`文件内容为自己的参数，默认用DeepSeek，去开个接口吧，很便宜，10元用1年：
+修改根目录下的`config.env`文件内容为自己的参数。
+文本生成默认用DeepSeek，去开个接口吧，很便宜，10元用1年。
+语音合成默认用用豆包语音合成，玩一下不耗钱，开一个吧。
 
 ```text
 DEEPSEEK_API_KEY=sk-b7f7feda7d254*******************
+DOUBAO_TTS_APPID=48163******
+DOUBAO_TTS_ACCESS_TOKEN=49T570uTf3kn********************
 QIANFAN_ACCESS_KEY=ALTAKc5yYaLe5QS***********
 QIANFAN_SECRET_KEY=eb058f32d47a4c5*****************
 ```

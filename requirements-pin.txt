@@ -1,0 +1,14 @@
+fitz==0.0.1.dev2
+gradio==5.42.0
+librosa==0.11.0
+moviepy==1.0.3
+numpy==2.3.2
+Pillow==11.3.0
+pydub==0.25.1
+python-dotenv==1.1.1
+python_pptx==1.0.2
+pyttsx3==2.99
+qianfan==0.4.12.3
+Requests==2.32.4
+soundfile==0.13.1
+tqdm==4.67.1

@@ -113,3 +113,298 @@ def chat(prompt, max_retries=3, retry_delay=2):
 
     logger.error(f"API调用失败，已达最大重试次数")
     return None
+
+
+import base64
+import json
+import uuid
+import requests
+
+# https://www.volcengine.com/docs/6561/163043
+# 填写平台申请的appid, access_token以及cluster
+appid = os.getenv("DOUBAO_TTS_APPID", "4816******")
+access_token = os.getenv("DOUBAO_TTS_ACCESS_TOKEN", "49T570uTf3knO*********************")
+cluster = "volcano_tts"
+
+voice_type = "BV700_V2_streaming"
+host = "openspeech.bytedance.com"
+api_url = f"https://{host}/api/v1/tts"
+
+header = {"Authorization": f"Bearer;{access_token}"}
+
+
+def tts(text, speaker, save_path):
+    request_json = {
+        "app": {
+            "appid": appid,
+            "token": "access_token",
+            "cluster": cluster
+        },
+        "user": {
+            "uid": "388808087185088"
+        },
+        "audio": {
+            "voice_type": speaker,
+            "encoding": "mp3",
+            "speed_ratio": 1.0,
+            "volume_ratio": 1.0,
+            "pitch_ratio": 1.0,
+        },
+        "request": {
+            "reqid": str(uuid.uuid4()),
+            "text": text,
+            "text_type": "plain",
+            "operation": "query",
+            "with_frontend": 1,
+            "frontend_type": "unitTson"
+        }
+    }
+    try:
+        resp = requests.post(api_url, json.dumps(request_json), headers=header)
+        # print(f"resp body: \n{resp.json()}")
+        if "data" in resp.json():
+            data = resp.json()["data"]
+            file_to_save = open(save_path, "wb")
+            file_to_save.write(base64.b64decode(data))
+    except Exception as e:
+        e.with_traceback()
+
+voice_type_desc = """灿灿 2.0	BV700_V2_streaming
+炀炀	BV705_streaming
+擎苍 2.0	BV701_V2_streaming
+通用女声 2.0	BV001_V2_streaming
+灿灿	BV700_streaming
+超自然音色-梓梓2.0	BV406_V2_streaming
+超自然音色-梓梓	BV406_streaming
+超自然音色-燃燃2.0	BV407_V2_streaming
+超自然音色-燃燃	BV407_streaming
+通用女声	BV001_streaming
+通用男声	BV002_streaming
+擎苍	BV701_streaming
+阳光青年	BV123_streaming
+反卷青年	BV120_streaming
+通用赘婿	BV119_streaming
+古风少御	BV115_streaming
+霸气青叔	BV107_streaming
+质朴青年	BV100_streaming
+温柔淑女	BV104_streaming
+开朗青年	BV004_streaming
+甜宠少御	BV113_streaming
+儒雅青年	BV102_streaming
+甜美小源	BV405_streaming
+亲切女声	BV007_streaming
+知性女声	BV009_streaming
+诚诚	BV419_streaming
+童童	BV415_streaming
+亲切男声	BV008_streaming
+译制片男声	BV408_streaming
+懒小羊	BV426_streaming
+清新文艺女声	BV428_streaming
+鸡汤女声	BV403_streaming
+智慧老者	BV158_streaming
+慈爱姥姥	BV157_streaming
+说唱小哥	BR001_streaming
+活力解说男	BV410_streaming
+影视解说小帅	BV411_streaming
+解说小帅-多情感	BV437_streaming
+影视解说小美	BV412_streaming
+纨绔青年	BV159_streaming
+直播一姐	BV418_streaming
+反卷青年	BV120_streaming
+沉稳解说男	BV142_streaming
+潇洒青年	BV143_streaming
+阳光男声	BV056_streaming
+活泼女声	BV005_streaming
+小萝莉	BV064_streaming
+奶气萌娃	BV051_streaming
+动漫海绵	BV063_streaming
+动漫海星	BV417_streaming
+动漫小新	BV050_streaming
+天才童声	BV061_streaming
+促销男声	BV401_streaming
+促销女声	BV402_streaming
+磁性男声	BV006_streaming
+新闻女声	BV011_streaming
+新闻男声	BV012_streaming
+知性姐姐-双语	BV034_streaming
+温柔小哥	BV033_streaming
+灿灿 2.0	BV700_V2_streaming
+炀炀	BV705_streaming
+擎苍 2.0	BV701_V2_streaming
+通用女声 2.0	BV001_V2_streaming
+灿灿	BV700_streaming
+超自然音色-梓梓2.0	BV406_V2_streaming
+超自然音色-梓梓	BV406_streaming
+超自然音色-燃燃2.0	BV407_V2_streaming
+超自然音色-燃燃	BV407_streaming
+通用女声	BV001_streaming
+通用男声	BV002_streaming
+擎苍	BV701_streaming
+阳光青年	BV123_streaming
+反卷青年	BV120_streaming
+通用赘婿	BV119_streaming
+古风少御	BV115_streaming
+霸气青叔	BV107_streaming
+质朴青年	BV100_streaming
+温柔淑女	BV104_streaming
+开朗青年	BV004_streaming
+甜宠少御	BV113_streaming
+儒雅青年	BV102_streaming
+甜美小源	BV405_streaming
+亲切女声	BV007_streaming
+知性女声	BV009_streaming
+诚诚	BV419_streaming
+童童	BV415_streaming
+亲切男声	BV008_streaming
+译制片男声	BV408_streaming
+懒小羊	BV426_streaming
+清新文艺女声	BV428_streaming
+鸡汤女声	BV403_streaming
+智慧老者	BV158_streaming
+慈爱姥姥	BV157_streaming
+说唱小哥	BR001_streaming
+活力解说男	BV410_streaming
+影视解说小帅	BV411_streaming
+解说小帅-多情感	BV437_streaming
+影视解说小美	BV412_streaming
+纨绔青年	BV159_streaming
+直播一姐	BV418_streaming
+反卷青年	BV120_streaming
+沉稳解说男	BV142_streaming
+潇洒青年	BV143_streaming
+阳光男声	BV056_streaming
+活泼女声	BV005_streaming
+小萝莉	BV064_streaming
+奶气萌娃	BV051_streaming
+动漫海绵	BV063_streaming
+动漫海星	BV417_streaming
+动漫小新	BV050_streaming
+天才童声	BV061_streaming
+促销男声	BV401_streaming
+促销女声	BV402_streaming
+磁性男声	BV006_streaming
+新闻女声	BV011_streaming
+新闻男声	BV012_streaming
+知性姐姐-双语	BV034_streaming
+温柔小哥	BV033_streaming
+灿灿 2.0	BV700_V2_streaming
+炀炀	BV705_streaming
+擎苍 2.0	BV701_V2_streaming
+通用女声 2.0	BV001_V2_streaming
+灿灿	BV700_streaming
+超自然音色-梓梓2.0	BV406_V2_streaming
+超自然音色-梓梓	BV406_streaming
+超自然音色-燃燃2.0	BV407_V2_streaming
+超自然音色-燃燃	BV407_streaming
+通用女声	BV001_streaming
+通用男声	BV002_streaming
+擎苍	BV701_streaming
+阳光青年	BV123_streaming
+反卷青年	BV120_streaming
+通用赘婿	BV119_streaming
+古风少御	BV115_streaming
+霸气青叔	BV107_streaming
+质朴青年	BV100_streaming
+温柔淑女	BV104_streaming
+开朗青年	BV004_streaming
+甜宠少御	BV113_streaming
+儒雅青年	BV102_streaming
+甜美小源	BV405_streaming
+亲切女声	BV007_streaming
+知性女声	BV009_streaming
+诚诚	BV419_streaming
+童童	BV415_streaming
+亲切男声	BV008_streaming
+译制片男声	BV408_streaming
+懒小羊	BV426_streaming
+清新文艺女声	BV428_streaming
+鸡汤女声	BV403_streaming
+智慧老者	BV158_streaming
+慈爱姥姥	BV157_streaming
+说唱小哥	BR001_streaming
+活力解说男	BV410_streaming
+影视解说小帅	BV411_streaming
+解说小帅-多情感	BV437_streaming
+影视解说小美	BV412_streaming
+纨绔青年	BV159_streaming
+直播一姐	BV418_streaming
+反卷青年	BV120_streaming
+沉稳解说男	BV142_streaming
+潇洒青年	BV143_streaming
+阳光男声	BV056_streaming
+活泼女声	BV005_streaming
+小萝莉	BV064_streaming
+奶气萌娃	BV051_streaming
+动漫海绵	BV063_streaming
+动漫海星	BV417_streaming
+动漫小新	BV050_streaming
+天才童声	BV061_streaming
+促销男声	BV401_streaming
+促销女声	BV402_streaming
+磁性男声	BV006_streaming
+新闻女声	BV011_streaming
+新闻男声	BV012_streaming
+知性姐姐-双语	BV034_streaming
+温柔小哥	BV033_streaming
+灿灿 2.0	BV700_V2_streaming
+炀炀	BV705_streaming
+擎苍 2.0	BV701_V2_streaming
+通用女声 2.0	BV001_V2_streaming
+灿灿	BV700_streaming
+超自然音色-梓梓2.0	BV406_V2_streaming
+超自然音色-梓梓	BV406_streaming
+超自然音色-燃燃2.0	BV407_V2_streaming
+超自然音色-燃燃	BV407_streaming
+通用女声	BV001_streaming
+通用男声	BV002_streaming
+擎苍	BV701_streaming
+阳光青年	BV123_streaming
+反卷青年	BV120_streaming
+通用赘婿	BV119_streaming
+古风少御	BV115_streaming
+霸气青叔	BV107_streaming
+质朴青年	BV100_streaming
+温柔淑女	BV104_streaming
+开朗青年	BV004_streaming
+甜宠少御	BV113_streaming
+儒雅青年	BV102_streaming
+甜美小源	BV405_streaming
+亲切女声	BV007_streaming
+知性女声	BV009_streaming
+诚诚	BV419_streaming
+童童	BV415_streaming
+亲切男声	BV008_streaming
+译制片男声	BV408_streaming
+懒小羊	BV426_streaming
+清新文艺女声	BV428_streaming
+鸡汤女声	BV403_streaming
+智慧老者	BV158_streaming
+慈爱姥姥	BV157_streaming
+说唱小哥	BR001_streaming
+活力解说男	BV410_streaming
+影视解说小帅	BV411_streaming
+解说小帅-多情感	BV437_streaming
+影视解说小美	BV412_streaming
+纨绔青年	BV159_streaming
+直播一姐	BV418_streaming
+反卷青年	BV120_streaming
+沉稳解说男	BV142_streaming
+潇洒青年	BV143_streaming
+阳光男声	BV056_streaming
+活泼女声	BV005_streaming
+小萝莉	BV064_streaming
+奶气萌娃	BV051_streaming
+动漫海绵	BV063_streaming
+动漫海星	BV417_streaming
+动漫小新	BV050_streaming
+天才童声	BV061_streaming
+促销男声	BV401_streaming
+促销女声	BV402_streaming
+磁性男声	BV006_streaming
+新闻女声	BV011_streaming
+新闻男声	BV012_streaming
+知性姐姐-双语	BV034_streaming
+温柔小哥	BV033_streaming"""
+
+if __name__ == '__main__':
+    tts(text='欢迎来到语音合成的世界。', speaker='BV700_V2_streaming', save_path='tmp_tts.mp3')

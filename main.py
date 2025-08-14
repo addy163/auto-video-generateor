@@ -3,13 +3,15 @@ import base64
 import sys
 import os
 
-# 自行在环境变量设置千帆的参数
-# os.environ["QIANFAN_ACCESS_KEY"] = "ALTAKc5yYaLe5QS***********"
-# os.environ["QIANFAN_SECRET_KEY"] = "eb058f32d47a4c5*****************"
+# 自行在环境变量设置参数
 
 from dotenv import load_dotenv
+
 try:
-    load_dotenv('.env')
+    if os.path.exists('.env'):
+        load_dotenv('.env')
+    else:
+        load_dotenv('config.env')
 except:
     print('load env file failed!')
 
@@ -39,6 +41,6 @@ if __name__ == "__main__":
         share=True,
         server_port=8000,
         quiet=True,
-        # auth=auth_checking,
+        auth=auth_checking,
         auth_message='欢迎来到自动视频生成的世界'
     )

@@ -5,60 +5,7 @@ import subprocess
 from pptx import Presentation
 import fitz  # PyMuPDF
 
-import comtypes.client
-import pythoncom
-
 from common_utils import get_savepath, chat
-
-
-def ppt_to_images_windows(pptx_path, code_name):
-    """windows环境，需要激活的Microsoft Office支持。"""
-    image_dir = get_savepath(code_name, 'image', mkdir_ok=True)
-    # 初始化COM库
-    pythoncom.CoInitialize()
-    # 启动PowerPoint
-    powerpoint = comtypes.client.CreateObject("Powerpoint.Application")
-    powerpoint.Visible = 1
-
-    # 打开PPT文件
-    presentation = powerpoint.Presentations.Open(pptx_path)
-
-    # 遍历所有幻灯片
-    images = []
-    for i, slide in enumerate(presentation.Slides):
-        # 将幻灯片导出为图片
-        image_path = f'{image_dir}/image_{i + 100}.jpg'
-        slide.Export(image_path, "JPG")
-    # 关闭PPT文件
-    presentation.Close()
-    # 关闭PowerPoint
-    powerpoint.Quit()
-    # 清理COM库
-    pythoncom.CoUninitialize()
-    return images
-
-
-def ppt_to_texts_windows(pptx_path, code_name):
-    text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
-
-    # 打开PPT文件
-    prs = Presentation(pptx_path)
-
-    # 遍历所有幻灯片
-    texts = []
-    for i, slide in enumerate(prs.slides):
-        # 提取幻灯片的备注
-        notes_slide = slide.notes_slide
-        if notes_slide:
-            notes_text = '\n'.join([paragraph.text for paragraph in notes_slide.notes_text_frame.paragraphs])
-            notes_text.replace('\n', '。')
-        else:
-            notes_text = '嗯。'
-        texts.append(notes_text)
-        notes_path = f'{text_dir}/text_{i + 100}.txt'
-        with open(notes_path, 'w', encoding='utf-8') as file:
-            file.write(notes_text)
-    return texts
 
 
 def ppt_to_pdf(inpath, code_name):
