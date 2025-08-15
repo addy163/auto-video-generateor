@@ -683,23 +683,72 @@ def create_video(results, code_name="", save_path='', request: gr.Request = None
     clips = []
     for dt in tqdm.tqdm(results, desc="create_video"):
         audio = AudioFileClip(get_abspath(code_name, dt["audio"]))
-        image = ImageClip(get_abspath(code_name, dt["image"])).set_duration(audio.duration)
-        video = image.set_audio(audio)
-        clips.append(video)
+        image = ImageClip(get_abspath(code_name, dt["image"]))
+        video = image.set_duration(audio.duration).set_audio(audio)
+        # try:
+        #     video.preview()  # 测试能否播放
+        # except Exception as e:
+        #     print("损坏的视频片段:", dt, e)
 
-    # 逐个验证视频片段
-    for i, clip in enumerate(clips):
-        try:
-            clip.preview()  # 测试能否播放
-        except:
-            print("损坏的视频片段:", i)
-            clips.remove(clip)
+        f1, msg1 = is_video_renderable(video)
+        f2, msg2 = check_audio_video_sync(video)
+        if f1 and f2:
+            clips.append(video)
+        else:
+            print("损坏的视频片段:", dt)
+            print(msg1, msg1, )
 
     final_video = concatenate_videoclips(clips, method="compose")
     final_video.write_videofile(video_file, fps=4)  # 24
     print(f"create_video 输入: {results}")
     print(f"create_video 输出: {video_file}")
     return video_file
+
+
+def is_video_renderable(video):
+    try:
+        # 渲染第一帧并保存为临时图片
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            video.save_frame(tmp.name, t=0)  # t=0表示第一帧
+        os.unlink(tmp.name)  # 验证后删除
+        return True, "可正常渲染帧"
+    except Exception as e:
+        return False, f"渲染失败：{str(e)}"
+
+
+def is_video_valid(video):
+    try:
+        # 检查时长（必须>0）
+        if video.duration <= 0:
+            return False, "视频时长异常（≤0）"
+
+        # 检查尺寸（宽高必须>0）
+        if video.size[0] <= 0 or video.size[1] <= 0:
+            return False, "视频尺寸异常（宽高≤0）"
+
+        # 检查帧率（通常≥1）
+        if video.fps < 1:
+            return False, "帧率异常（<1）"
+
+        # 若有音频，检查音频属性
+        if hasattr(video, 'audio') and video.audio is not None:
+            if video.audio.duration <= 0:
+                return False, "音频时长异常（≤0）"
+
+        return True, "视频属性正常"
+    except Exception as e:
+        return False, f"属性检查失败：{str(e)}"
+
+
+def check_audio_video_sync(video):
+    if not hasattr(video, 'audio') or video.audio is None:
+        return True, "无音频，无需同步"
+
+    # 允许微小误差（如0.1秒内）
+    if abs(video.duration - video.audio.duration) < 0.1:
+        return True, "音视频时长匹配"
+    else:
+        return False, f"音视频时长不匹配（视频：{video.duration}s，音频：{video.audio.duration}s）"
 
 
 def generate_results_base(story, size, font, person, voice_input, rate_input, volume_input, pitch_input, code_name=""):
