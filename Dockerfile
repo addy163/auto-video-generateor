@@ -19,8 +19,6 @@ COPY ./requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt -i https://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
 #RUN pip install --no-cache-dir -r /tmp/requirements.txt -i http://mirrors.cloud.tencent.com/pypi/simple --trusted-host mirrors.cloud.tencent.com
 
-RUN pip install moviepy==1.0.3 -i https://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
-
 WORKDIR ${BUILD_PREFIX}
 
 COPY . ${BUILD_PREFIX}
