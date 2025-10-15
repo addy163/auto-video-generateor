@@ -12,6 +12,7 @@
 import json
 import re
 import tempfile
+import time
 
 import gradio as gr
 import pydub
@@ -24,8 +25,17 @@ import tqdm
 
 # import edge_tts
 
+import warnings
+import logging
+import jieba
+
 from common_utils import *
 from common_utils import _root_dir
+
+# 忽略特定警告
+warnings.filterwarnings("ignore", category=UserWarning, module="moviepy.video.io.ffmpeg_reader")
+# 或者降低 moviepy 的日志级别
+logging.getLogger("moviepy.video.io.ffmpeg_reader").setLevel(logging.ERROR)
 
 
 # 示例故事文本
@@ -65,19 +75,115 @@ def save_story(story="", code_name="", request: gr.Request = None):
 
 # 分句
 def split_sentences(story, code_name=""):
-    text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
+    # text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
 
     # sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|。|！|？)\s*', story)
-    sentences = re.split(r'(["\'(\[“‘（【《]*.+?["\')\]”’）】》]*[\n。？?！!；;—…：:]+\s*)', story)
-    sentences = [w.strip() for sen in sentences for w in re.split(r"(.{10,56}\W+)", sen)
-                 if re.search(r'\w', w.strip())]
-    for i, sentence in enumerate(tqdm.tqdm(sentences, desc="split_sentences")):
-        text_path = f'{text_dir}/text_{i + 100}.txt'
-        with open(text_path, 'wt', encoding='utf8') as fout:
-            fout.write(sentence)
+    # sentences = re.split(r'(["\'(\[“‘（【《]*.+?["\')\]”’）】》]*[\n。？?！!；;—…：:]+\s*)', story)
+    # sentences = [w.strip() for sen in sentences for w in re.split(r"(.{10,56}\W+)", sen)
+    #              if re.search(r'\w', w.strip())]
+    # for i, sentence in enumerate(tqdm.tqdm(sentences, desc="split_sentences")):
+    #     text_path = f'{text_dir}/text_{i + 100}.txt'
+    #     with open(text_path, 'wt', encoding='utf8') as fout:
+    #         fout.write(sentence)
+    sentences = split_text(story, max_length=47)
+    sentences = [w.strip() for w in sentences if re.search(r'\w', w.strip())]
     print(f"split_sentences 输入: {story}")
     print(f"split_sentences 输出: {sentences}")
     return sentences
+
+
+def split_text(text, max_length=30):
+    """
+    文本切分算法
+
+    参数:
+        text: 要切分的文本
+        max_length: 最大切分长度，默认为60
+
+    返回:
+        切分后的文本列表
+    """
+    # sentences = re.split(r'(["\'(\[“‘（【《]*.+?["\')\]”’）】》]*[\n。？?！!；;—…：:]+\s*)', story)
+
+    # 如果文本长度小于等于最大长度，直接返回
+    if len(text) <= max_length:
+        return [text]
+
+    # 第一级切分：按完整句子切分（句号、问号、感叹号等）
+    sentences = re.split(r'([\n。？?！!；;…])', text)
+
+    # 重新组合句子，保留标点
+    result = []
+    for i in range(0, len(sentences) - 1, 2):
+        if i + 1 < len(sentences):
+            sentence = sentences[i] + sentences[i + 1]
+            if sentence.strip():  # 忽略空字符串
+                result.append(sentence)
+
+    # 处理最后一个可能不完整的句子
+    if len(sentences) % 2 == 1 and sentences[-1].strip():
+        result.append(sentences[-1])
+
+    # 检查每个句子长度，如果超过最大长度，进行第二级切分
+    final_result = []
+    for sentence in result:
+        if len(sentence) <= max_length:
+            final_result.append(sentence)
+        else:
+            # 第二级切分：按短句标点切分（分号、冒号等）
+            sub_sentences = re.split(r'([：:，,—])', sentence)
+
+            sub_result = []
+            for j in range(0, len(sub_sentences) - 1, 2):
+                if j + 1 < len(sub_sentences):
+                    sub_sentence = sub_sentences[j] + sub_sentences[j + 1]
+                    if sub_sentence.strip():
+                        sub_result.append(sub_sentence)
+
+            if len(sub_sentences) % 2 == 1 and sub_sentences[-1].strip():
+                sub_result.append(sub_sentences[-1])
+
+            # 检查每个子句长度，如果超过最大长度，进行第三级切分
+            for sub_sentence in sub_result:
+                if len(sub_sentence) <= max_length:
+                    final_result.append(sub_sentence)
+                else:
+                    # 第三级切分：按停顿符号切分（逗号、顿号等）
+                    clauses = re.split(r'(\W)', sub_sentence)
+
+                    clause_result = []
+                    for k in range(0, len(clauses) - 1, 2):
+                        if k + 1 < len(clauses):
+                            clause = clauses[k] + clauses[k + 1]
+                            if clause.strip():
+                                clause_result.append(clause)
+
+                    if len(clauses) % 2 == 1 and clauses[-1].strip():
+                        clause_result.append(clauses[-1])
+
+                    # 检查每个子句长度，如果超过最大长度，进行第四级切分
+                    for clause in clause_result:
+                        if len(clause) <= max_length:
+                            final_result.append(clause)
+                        else:
+                            # 第四级切分：按词边际切分
+                            # 使用正则表达式匹配中文词语边界
+                            words = jieba.cut(clause)
+
+                            # 将词语组合成不超过最大长度的片段
+                            current_chunk = ""
+                            for word in words:
+                                if len(current_chunk) + len(word) <= max_length:
+                                    current_chunk += word
+                                else:
+                                    if current_chunk:
+                                        final_result.append(current_chunk)
+                                    current_chunk = word
+
+                            if current_chunk:
+                                final_result.append(current_chunk)
+
+    return final_result
 
 
 def get_tts_voices_edge_tts():
@@ -419,7 +525,7 @@ def synthesize_speech(sentences, voice="zh-CN-YunxiNeural", rate='+0%', volume='
         if save_path:
             audio_path = save_path
         else:
-            audio_path = f"{audio_dir}/audio_{i + 100}.mp3"
+            audio_path = f"{audio_dir}/audio_{i + 100}.wav"
             if os.path.isfile(audio_path):
                 audio_files.append(audio_path)
                 yield audio_path
@@ -447,11 +553,11 @@ def synthesize_speech(sentences, voice="zh-CN-YunxiNeural", rate='+0%', volume='
             tts_engine.save_to_file(text=sentence, filename=audio_path)
             tts_engine.runAndWait()
 
-        seg = pydub.AudioSegment.from_file(audio_path)
-        sil_head = detect_leading_silence(seg)
-        sil_tail = detect_leading_silence(seg.reverse())
-        seg = seg[max(0, sil_head - 150): max(1, len(seg) - sil_tail + 150)]
-        seg.export(audio_path, format='mp3')
+        # seg = pydub.AudioSegment.from_file(audio_path)
+        # sil_head = detect_leading_silence(seg, silence_threshold=-64)
+        # sil_tail = detect_leading_silence(seg.reverse(), silence_threshold=-64)
+        # seg = seg[max(0, sil_head - 200): max(1, len(seg) - sil_tail + 200)]
+        # seg.export(audio_path, format='wav')
 
         audio_files.append(audio_path)
         yield audio_path
@@ -655,7 +761,7 @@ def create_resources(texts, prompts, audios, images, code_name):
         #           image=get_relpath(code_name, img),
         #           resource=get_relpath(code_name, res_path))
         dt = dict(index=i, text=sen, prompt=pmt,
-                  audio=f'audio/audio_{i + 100}.mp3',  # os.path.basename(aud)
+                  audio=f'audio/audio_{i + 100}.wav',  # os.path.basename(aud)
                   image=f'image/image_{i + 100}.png',  # os.path.basename(img)
                   resource=get_relpath(code_name, res_path))
         with open(res_path, 'wt', encoding='utf8') as fout:
@@ -682,9 +788,16 @@ def create_video(results, code_name="", save_path='', request: gr.Request = None
     #     results = results.to_numpy()
     clips = []
     for dt in tqdm.tqdm(results, desc="create_video"):
-        audio = AudioFileClip(get_abspath(code_name, dt["audio"]))
-        image = ImageClip(get_abspath(code_name, dt["image"]))
-        video = image.set_duration(audio.duration).set_audio(audio)
+        try:
+            audio = AudioFileClip(get_abspath(code_name, dt["audio"]))
+            image = ImageClip(get_abspath(code_name, dt["image"]))
+            video = image.set_duration(audio.duration).set_audio(audio)
+        except Exception as e:
+            time.sleep(500)
+            print(e, dt)
+            audio = AudioFileClip(get_abspath(code_name, dt["audio"]))
+            image = ImageClip(get_abspath(code_name, dt["image"]))
+            video = image.set_duration(audio.duration).set_audio(audio)
         # try:
         #     video.preview()  # 测试能否播放
         # except Exception as e:
@@ -696,7 +809,7 @@ def create_video(results, code_name="", save_path='', request: gr.Request = None
             clips.append(video)
         else:
             print("损坏的视频片段:", dt)
-            print(msg1, msg1, )
+            print(msg1, msg1)
 
     final_video = concatenate_videoclips(clips, method="compose")
     final_video.write_videofile(video_file, fps=4)  # 24
@@ -792,3 +905,199 @@ def one_click_pipeline(theme, template, size, font, person, voice_input, rate_in
     yield story, results, None
     video = create_video(results, code_name)
     yield story, results, video
+
+
+from moviepy.editor import VideoFileClip, CompositeVideoClip
+from moviepy.video.VideoClip import ImageClip
+from PIL import Image, ImageDraw, ImageFont
+import numpy as np
+import re
+from datetime import datetime
+
+import os
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+import math
+
+
+def generate_subtitles_from_audio(audio_files, subtitles, output_path):
+    """
+    根据音频文件列表和对应的字幕生成SRT字幕文件
+
+    参数:
+    audio_files: 音频文件路径列表，按拼接顺序排列
+    subtitles: 对应的字幕文本列表，长度应与audio_files相同
+    output_path: 输出的SRT字幕文件路径
+    silence_threshold: 静音检测阈值(dBFS)，低于此值被认为是静音
+    min_silence_len: 最小静音长度(毫秒)，用于检测音频分段
+
+    返回:
+    无，直接生成SRT文件
+    """
+
+    # 检查输入参数
+    if len(audio_files) != len(subtitles):
+        raise ValueError("音频文件列表和字幕列表长度必须相同")
+
+    # 初始化变量
+    total_duration = 0  # 累计时长(毫秒)
+    subtitle_entries = []  # 存储字幕条目
+
+    # 处理每个音频文件
+    for i, (audio_file, subtitle_text) in enumerate(zip(audio_files, subtitles)):
+        # 检查音频文件是否存在
+        if not os.path.exists(audio_file):
+            raise FileNotFoundError(f"音频文件不存在: {audio_file}")
+
+        # 加载音频文件
+        audio = AudioSegment.from_file(audio_file)
+        audio_duration = len(audio)  # 音频时长(毫秒)
+
+        # 计算开始和结束时间
+        start_time = total_duration
+        end_time = total_duration + audio_duration
+
+        # 添加到字幕条目
+        subtitle_entries.append({
+            'index': i + 1,
+            'start': start_time,
+            'end': end_time,
+            'text': subtitle_text
+        })
+
+        # 更新累计时长
+        total_duration = end_time
+
+    # 将时间转换为SRT格式
+    def format_time(ms):
+        """将毫秒转换为SRT时间格式: HH:MM:SS,mmm"""
+        hours = ms // 3600000
+        ms %= 3600000
+        minutes = ms // 60000
+        ms %= 60000
+        seconds = ms // 1000
+        ms %= 1000
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{ms:03d}"
+
+    # 生成SRT文件内容
+    srt_content = ""
+    for entry in subtitle_entries:
+        start_str = format_time(entry['start'])
+        end_str = format_time(entry['end'])
+        srt_content += f"{entry['index']}\n{start_str} --> {end_str}\n{entry['text']}\n\n"
+
+    # 写入文件
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(srt_content)
+
+    print(f"字幕文件已生成: {output_path}")
+
+
+def parse_srt(srt_file):
+    """解析SRT字幕文件"""
+    subtitles = []
+    with open(srt_file, 'rt', encoding='utf-8') as f:
+        content = f.read()
+
+    pattern = r'(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n(.*?)(?=\n\d+\n|\n*$)'
+    matches = re.findall(pattern, content, re.DOTALL)
+
+    for match in matches:
+        index, start, end, text = match
+        text = re.sub(r'\s+', ' ', text.strip())
+
+        start_time = datetime.strptime(start, '%H:%M:%S,%f')
+        end_time = datetime.strptime(end, '%H:%M:%S,%f')
+
+        start_seconds = start_time.hour * 3600 + start_time.minute * 60 + start_time.second + start_time.microsecond / 1000000
+        end_seconds = end_time.hour * 3600 + end_time.minute * 60 + end_time.second + end_time.microsecond / 1000000
+
+        subtitles.append((start_seconds, end_seconds, text))
+
+    return subtitles
+
+
+def create_subtitle_image(text, video_size=(1280, 720), font="msyh.ttc+-1", location=(0.5, 0.85),
+                          color=(0, 0, 0)):
+    width, height = video_size
+    img = Image.new('RGBA', (width, height), color=(0, 0, 0, 0))
+
+    d = ImageDraw.Draw(img)
+
+    font_name, font_size = font.split('+')
+    if font_size == '-1':
+        if len(text) < 32:
+            font_size = int(width) // 32
+        elif 32 <= len(text) < 40:
+            font_size = int(width) // 40
+        elif 40 <= len(text) < 48:
+            font_size = int(width) // 48
+        else:
+            font_size = int(width) // 64
+
+    if int(font_size):
+        # 使用Windows系统中的微软雅黑字体
+        font_path = f"C:/Windows/Fonts/{font_name}"  # 微软雅黑字体文件路径
+        if not os.path.isfile(font_path):
+            font_path = os.path.join(_root_dir, f'static/fonts/{font_name}')
+        font_file = ImageFont.truetype(font_path, int(font_size))
+        bbox = d.textbbox((0, 0), text, font=font_file)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        # width, height = img.size
+        x = (width - text_w) * location[0]
+        y = (height - text_h) * location[1]
+        d.text((x, y), text, font=font_file, fill=color)
+
+        # 先绘制白色描边
+        for dx in [-2, -1, 0, 1, 2]:
+            for dy in [-2, -1, 0, 1, 2]:
+                if dx == 0 and dy == 0:
+                    continue
+                d.text((x + dx, y + dy), text, font=font_file, fill="white")
+
+        # 再绘制黑色文本
+        d.text((x, y), text, font=font_file, fill=color)
+
+        # 转换为numpy数组
+        return np.array(img)
+    else:
+        # 如果字幕size为0，则不显示字幕
+        return np.array(img)
+
+
+def add_subtitles_to_video(video_path, srt_path, output_path, font="msyh.ttc+-1",
+                           location=(0.5, 0.9), color=(0, 0, 0)):
+    """使用PIL为视频添加字幕"""
+    # 加载视频
+    video = VideoFileClip(video_path)
+    video_width, video_height = video.size
+
+    # 解析字幕文件
+    subtitles = parse_srt(srt_path)
+
+    # 创建字幕剪辑列表
+    subtitle_clips = []
+
+    for start, end, text in subtitles:
+        # 创建字幕图像
+        subtitle_img = create_subtitle_image(text, video_size=(video_width, video_height),
+                                             font=font, location=location, color=color)
+
+        # 创建图像剪辑
+        img_clip = ImageClip(subtitle_img, duration=end - start)
+
+        # 设置位置（底部）
+        img_clip = img_clip.set_position(('center', 'center')).set_start(start)
+
+        subtitle_clips.append(img_clip)
+
+    # 将字幕合成到视频上
+    final_video = CompositeVideoClip([video] + subtitle_clips)
+
+    # 输出视频
+    final_video.write_videofile(output_path, codec='libx264', audio_codec='aac')
+
+    # 关闭视频对象
+    video.close()
+    final_video.close()

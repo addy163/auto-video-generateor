@@ -3,6 +3,7 @@ import time
 import pathlib
 
 import gradio
+import pydub
 import qianfan
 
 import logging
@@ -145,7 +146,7 @@ def tts(text, speaker, save_path):
         },
         "audio": {
             "voice_type": speaker,
-            "encoding": "mp3",
+            "encoding": "wav",
             "speed_ratio": 1.0,
             "volume_ratio": 1.0,
             "pitch_ratio": 1.0,
@@ -166,6 +167,10 @@ def tts(text, speaker, save_path):
             data = resp.json()["data"]
             file_to_save = open(save_path, "wb")
             file_to_save.write(base64.b64decode(data))
+        # aud = pydub.AudioSegment.from_file(save_path)
+        # sil = pydub.AudioSegment.silent(duration=100, frame_rate=aud.frame_rate)
+        # aud = sil + aud + sil
+        # aud.export(save_path, format='wav')
     except Exception as e:
         e.with_traceback()
 
@@ -407,4 +412,5 @@ voice_type_desc = """灿灿 2.0	BV700_V2_streaming
 温柔小哥	BV033_streaming"""
 
 if __name__ == '__main__':
-    tts(text='欢迎来到语音合成的世界。', speaker='BV700_V2_streaming', save_path='tmp_tts.mp3')
+    print('tts')
+    tts(text='欢迎来到语音合成的世界。', speaker='BV700_V2_streaming', save_path='mnt/tmp_tts.mp3')

@@ -39,8 +39,8 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         # inbrowser=True,
         share=True,
-        server_port=8000,
+        server_port=9020,
         quiet=True,
         auth=auth_checking,
-        auth_message='欢迎来到自动视频生成的世界'
+        auth_message='欢迎来到自动视频生成的世界！'
     )

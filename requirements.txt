@@ -18,3 +18,4 @@ PyMuPDF
 comtypes
 Pillow
 gTTS
+jieba

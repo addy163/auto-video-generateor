@@ -39,7 +39,7 @@ def ppt_to_pdf(inpath, code_name):
     return ppt_path, pdf_path
 
 
-def pdf_to_images(pdf_path, code_name):
+def pdf_to_images(pdf_path, ij_dict, code_name):
     image_dir = get_savepath(code_name, 'image', mkdir_ok=True)
 
     # Step 2: 将PDF的每一页转换为图片
@@ -53,6 +53,7 @@ def pdf_to_images(pdf_path, code_name):
     pdf_document = fitz.open(pdf_path)
     images = []
     # 遍历每一页
+    j_cnt = 0
     for page_num in range(pdf_document.page_count):
         # 获取页面
         page = pdf_document[page_num]
@@ -63,17 +64,18 @@ def pdf_to_images(pdf_path, code_name):
 
         # 渲染页面为图片
         pix = page.get_pixmap(matrix=matrix)
-
-        # 保存图片
-        image_path = f'{image_dir}/image_{page_num + 100}.{image_format}'
-        pix.save(image_path)
-        print(f"Saved: {image_path}")
-        images.append(image_path)
+        for j in range(ij_dict[page_num]):
+            # 保存图片
+            image_path = f'{image_dir}/image_{j_cnt + 100}.{image_format}'
+            pix.save(image_path)
+            print(f"Saved: {image_path}")
+            images.append(image_path)
+            j_cnt += 1
     return images
 
 
-def pdf_to_texts(pdf_path, code_name):
-    text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
+def pdf_to_texts(pdf_path, prompt_template, code_name):
+    # text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
 
     # Step 2: 将PDF的每一页转换为文字
     # 检查 PDF 文件是否存在
@@ -89,19 +91,19 @@ def pdf_to_texts(pdf_path, code_name):
         page = pdf_document[page_num]
 
         text = page.get_text()  # 提取当前页的文本
-        prompt_text = f'请用口述风格简明扼要讲解以下PPT内容，限制在60字以内，仅输出讲解内容。\nPPT内容：{text}。\n注意：请直接输出讲解内容。'
+        prompt_text = prompt_template.format(text)
         note_text = chat(prompt_text)
         texts.append(note_text)
-        note_path = f'{text_dir}/text_{page_num + 100}.txt'
-        with open(note_path, 'w', encoding='utf-8') as file:
-            file.write(note_text)
-
-        print(f"Saved notes: {note_path}")
+        # note_path = f'{text_dir}/text_{page_num + 100}.txt'
+        # with open(note_path, 'w', encoding='utf-8') as file:
+        #     file.write(note_text)
+        #
+        # print(f"Saved notes: {note_path}")
     return texts
 
 
 def ppt_to_texts(ppt_path, code_name):
-    text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
+    # text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
 
     # Step 3: 使用python-pptx提取每页备注并保存为TXT文件
     ppt = Presentation(ppt_path)
@@ -119,9 +121,9 @@ def ppt_to_texts(ppt_path, code_name):
         # note_text = note_text or texts_tmp or "嗯。"
 
         texts.append(note_text)
-        note_path = f'{text_dir}/text_{i + 100}.txt'
-        with open(note_path, 'w', encoding='utf-8') as file:
-            file.write(note_text)
-
-        print(f"Saved notes: {note_path}")
+        # note_path = f'{text_dir}/text_{i + 100}.txt'
+        # with open(note_path, 'w', encoding='utf-8') as file:
+        #     file.write(note_text)
+        #
+        # print(f"Saved notes: {note_path}")
     return texts

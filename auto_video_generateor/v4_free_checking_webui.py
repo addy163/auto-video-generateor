@@ -3,9 +3,11 @@
 
 自动生成视频及其文本、语音、图像素材，支持人工校对素材并修改，然后生成新的视频。
 """
+import re
 import tempfile
 
 import gradio
+import gradio.components.textbox
 
 from common_utils import *
 from ppt_utils import *
@@ -55,8 +57,8 @@ def b_load_click(code_name, request: gr.Request):
     return story_check, video_check, *data_list
 
 
-def b_save_metadata_click(topic, template, story, size, font, person, voice_input, rate_input, volume_input,
-                          pitch_input,
+def b_save_metadata_click(topic, template, story, size, font, person,
+                          voice_input, rate_input, volume_input, pitch_input,
                           code_name="", request: gr.Request = None):
     code_name = f'{request.username}/{code_name}'
     _save_dir = get_savepath(code_name, '', mkdir_ok=True)
@@ -72,8 +74,21 @@ def b_save_metadata_click(topic, template, story, size, font, person, voice_inpu
         print(dt)
 
 
-def b_generate_click(topic, template, story, size, font, person, voice_input, rate_input, volume_input, pitch_input,
+def b_generate_click(topic, template, story, ppt, ppt_template, size, font, person,
+                     voice_input, rate_input, volume_input, pitch_input,
                      code_name="", request: gr.Request = None):
+    if ppt and code_name:
+        yield from b_ppt_click(ppt, ppt_template, size, font, person,
+                               voice_input, rate_input, volume_input, pitch_input,
+                               code_name=code_name, request=request)
+    elif topic and code_name:
+        yield from b_story_click(topic, template, story, size, font, person,
+                                 voice_input, rate_input, volume_input, pitch_input,
+                                 code_name=code_name, request=request)
+
+
+def b_story_click(topic, template, story, size, font, person, voice_input, rate_input, volume_input, pitch_input,
+                  code_name="", request: gr.Request = None):
     """
     total_list = [
     *g_text_list,
@@ -121,7 +136,12 @@ def b_generate_click(topic, template, story, size, font, person, voice_input, ra
     yield story, video, *total_list
 
     sents = split_sentences(story, code_name=code_name)
+
+    text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
     for idx, text in enumerate(sents):
+        note_path = f'{text_dir}/text_{idx + 100}.txt'
+        with open(note_path, 'w', encoding='utf-8') as file:
+            file.write(text)
         total_list[idx] = text
         yield story, video, *total_list
 
@@ -166,7 +186,7 @@ def b_generate_click(topic, template, story, size, font, person, voice_input, ra
     yield story, video, *total_list
 
 
-def b_ppt_click(ppt, size, font, person, voice_input, rate_input, volume_input, pitch_input,
+def b_ppt_click(ppt, ppt_template, size, font, person, voice_input, rate_input, volume_input, pitch_input,
                 code_name="", request: gr.Request = None):
     """
     total_list = [
@@ -188,11 +208,17 @@ def b_ppt_click(ppt, size, font, person, voice_input, rate_input, volume_input, 
     :param code_name:
     :return:
     """
-    print(ppt)
     code_name = f'{request.username}/{code_name}'
     _save_dir = get_savepath(code_name, '', mkdir_ok=True)
 
     metadata_file = get_savepath(code_name, 'metadata.json', mkdir_ok=False)
+
+    with open(metadata_file, 'wt', encoding='utf8') as fout:
+        dt = dict(topic=ppt, ppt_template=ppt_template, template=person, story='',
+                  size=size, font=font, person=person,
+                  voice=voice_input, rate=rate_input, volume=volume_input, pitch=pitch_input,
+                  code_name=code_name, save_dir=_save_dir, resource_count=0)
+        json.dump(dt, fout, ensure_ascii=False, indent=4)
 
     # story = ''
     video = None
@@ -214,11 +240,29 @@ def b_ppt_click(ppt, size, font, person, voice_input, rate_input, volume_input, 
 
     ppt_path, pdf_path = ppt_to_pdf(ppt, code_name=code_name)
     if ppt_path:
-        sents = ppt_to_texts(ppt_path, code_name=code_name)
+        note_sents = ppt_to_texts(ppt_path, code_name=code_name)
     else:
-        sents = pdf_to_texts(pdf_path, code_name=code_name)
+        note_sents = pdf_to_texts(pdf_path, ppt_template, code_name=code_name)
 
-    sents = [w.replace('\n', '。') if w else '看幻灯片。' for w in sents]
+    text_dir = get_savepath(code_name, 'text', mkdir_ok=True)
+
+    sents = []
+    ijdt = {}
+    j_cnt = 0
+    for i_ppt, note_sent in enumerate(note_sents):
+        if not note_sent:
+            note_sent = '看幻灯片。'
+
+        one_sents = split_sentences(note_sent, code_name=code_name)
+        ijdt[i_ppt] = len(one_sents)
+        for i_sent, sent in enumerate(one_sents):
+            sents.append(sent)
+            note_path = f'{text_dir}/text_{j_cnt + 100}.txt'
+            with open(note_path, 'w', encoding='utf-8') as file:
+                file.write(sent)
+            j_cnt += 1
+
+    # sents = [w.replace('\n', '。') if w else '看幻灯片。' for w in sents]
     story = '\n'.join(sents)
     story = save_story(story, code_name=code_name)
     yield story, video, *total_list
@@ -237,11 +281,20 @@ def b_ppt_click(ppt, size, font, person, voice_input, rate_input, volume_input, 
         total_list[2 * g_max_json_index + idx] = audio
         yield story, video, *total_list
 
-    images = pdf_to_images(pdf_path, code_name=code_name)
+    images = pdf_to_images(pdf_path, ij_dict=ijdt, code_name=code_name)
+
     # images = generate_images(sents, size, font, person, code_name=code_name)
+
     for idx, image in enumerate(images):
         total_list[3 * g_max_json_index + idx] = image
         yield story, video, *total_list
+
+    # 字幕
+    subtitle_file = get_savepath(code_name, 'subtitle.srt', mkdir_ok=False)
+
+    subtitles = [re.sub(r'(^\W*|\W*$)', '', w) for w in sents]
+    audio_files = total_list[2 * g_max_json_index: 2 * g_max_json_index + len(sents)]
+    generate_subtitles_from_audio(audio_files=audio_files, subtitles=subtitles, output_path=subtitle_file)
 
     n_sents = len(sents)
     resources = create_resources(texts=total_list[: n_sents],
@@ -260,13 +313,16 @@ def b_ppt_click(ppt, size, font, person, voice_input, rate_input, volume_input, 
         yield story, video, *total_list
 
     with open(metadata_file, 'wt', encoding='utf8') as fout:
-        dt = dict(topic=ppt, template=person, story=story,
+        dt = dict(topic=ppt, ppt_template=ppt_template, template=person, story=story,
                   size=size, font=font, person=person,
                   voice=voice_input, rate=rate_input, volume=volume_input, pitch=pitch_input,
                   code_name=code_name, save_dir=_save_dir, resource_count=n_sents)
         json.dump(dt, fout, ensure_ascii=False, indent=4)
 
     video = create_video(resources, code_name)
+
+    add_subtitles_to_video(video_path=video, srt_path=subtitle_file, output_path=video, font=font)
+
     yield story, video, *total_list
 
 
@@ -326,6 +382,11 @@ def b_compose_video(username, code_name, *resource_list):
         results.append(dict(index=idx, text=sen, prompt=pmt, audio=aud, image=img, resource=res))
 
     video = create_video(results, code_name, save_path=video_file)
+
+    subtitle_file = get_savepath(code_name, 'subtitle.srt', mkdir_ok=False)
+
+    add_subtitles_to_video(video_path=video, srt_path=subtitle_file, output_path=video)  # , font=font)
+
     return video, False
 
 
@@ -521,6 +582,8 @@ template_value = """内容：```{}```
 
 image_prompt_value = "图像内容：{} 图像限制：电影风格，写实主义，环境简单，没有文字"
 
+ppt_template_value = '请用口述风格简明扼要讲解以下PPT内容，限制在60字以内，仅输出讲解内容。\nPPT内容：{}。\n注意：请直接输出讲解内容。'
+
 
 def load_username(request: gr.Request):
     # 这个函数可以用来更新界面元素，例如显示欢迎信息
@@ -528,13 +591,14 @@ def load_username(request: gr.Request):
     return request.username
 
 
-with gr.Blocks() as demo:
+with gr.Blocks(title="智动视频", theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 智动视频——自动视频生成系统")
     gr.Markdown("## 自动视频生成器")
     with gr.Row():
         username = gr.Textbox(value="", label="用户名", interactive=False)
         demo.load(load_username, inputs=None, outputs=[username])
         with gr.Column():
-            code_name_input = gr.Dropdown([], value="请修改代号", label="代号名称（支持自定义输入）",
+            code_name_input = gr.Dropdown([], value="", label="代号名称（支持自定义输入）",
                                           allow_custom_value=True)
             update_code_names_btn = gr.Button('更新代号列表')
             update_code_names_btn.click(b_update_code_names, inputs=None, outputs=code_name_input)
@@ -553,15 +617,21 @@ with gr.Blocks() as demo:
     with gr.Column():
         # with gr.TabItem("参数设置"):
         with gr.Column():
-            gr.Markdown("### 故事参数设置")
-            with gr.Row():
-                topic_input = gr.Textbox(label="主题", placeholder="输入主题内容", value="")
-                template_input = gr.Textbox(label="提示词模板", placeholder="输入提示词模板，用{}表示放主题文字的地方",
-                                            value=template_value)
-            gr.Markdown("### PPT上传")
-            with gr.Row():
-                ppt_input = gr.File(label="上传PPT文件")
-                ppt_button = gr.Button("生成视频")
+            with gr.Tab("故事生成视频"):
+                gr.Markdown("### 故事参数设置")
+                with gr.Row():
+                    topic_input = gr.Textbox(label="主题", placeholder="输入主题内容", value="")
+                    template_input = gr.Textbox(label="提示词模板",
+                                                placeholder="输入提示词模板，用{}表示放主题文字的地方",
+                                                value=template_value)
+            with gr.Tab("PPT生成视频"):
+                gr.Markdown("### PPT上传")
+                with gr.Row():
+                    ppt_input = gr.File(label="上传PPT文件")
+                    ppt_template_input = gr.Textbox(label="提示词模板",
+                                                    placeholder="输入提示词模板，用{}表示放PPT文字的地方",
+                                                    value=ppt_template_value)
+                    # ppt_button = gr.Button("PPT生成视频")
 
             gr.Markdown("### 图像参数设置")
             image_sizes = [
@@ -950,19 +1020,20 @@ with gr.Blocks() as demo:
     load_button.click(b_load_click,
                       inputs=[code_name_input],
                       outputs=[story_check, video_check, *total_list])
-    ppt_button.click(b_ppt_click,
-                     inputs=[ppt_input, size_input, font_input, person_input,
-                             voice_input,
-                             rate_input,
-                             volume_input, pitch_input, code_name_input],
-                     outputs=[story_check, video_check, *total_list])
-    generate_button.click(b_generate_click,
-                          inputs=[topic_input, template_input, story_check, size_input, font_input, person_input,
-                                  voice_input,
-                                  rate_input,
-                                  volume_input, pitch_input, code_name_input],
-                          outputs=[story_check, video_check, *total_list])
+    # ppt_button.click(b_ppt_click,
+    #                  inputs=[ppt_input, size_input, font_input, person_input,
+    #                          voice_input, rate_input, volume_input, pitch_input, code_name_input],
+    #                  outputs=[story_check, video_check, *total_list])
+    # story_button.click(b_story_click,
+    #                       inputs=[topic_input, template_input, story_check, size_input, font_input, person_input,
+    #                               voice_input, rate_input, volume_input, pitch_input, code_name_input],
+    #                       outputs=[story_check, video_check, *total_list])
 
+    generate_button.click(b_generate_click,
+                          inputs=[topic_input, template_input, story_check, ppt_input, ppt_template_input,
+                                  size_input, font_input, person_input,
+                                  voice_input, rate_input, volume_input, pitch_input, code_name_input],
+                          outputs=[story_check, video_check, *total_list])
     compose_video_button.click(b_compose_video, inputs=[username, code_name_input, *total_list],
                                outputs=[video_check, confirm_check])
     confirm_check.change(b_confirm_check_change, inputs=[code_name_input, video_check, confirm_check],
